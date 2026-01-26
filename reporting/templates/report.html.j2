@@ -163,6 +163,32 @@
       border-color: #3a4254;
     }
 
+    .summary {
+      border: 1px solid #242833;
+      border-radius: 12px;
+      padding: 20px 22px;
+      background: #141821;
+      margin: 10px 0 22px;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+      margin-top: 12px;
+    }
+
+    .summary-card {
+      border: 1px solid #202532;
+      border-radius: 10px;
+      padding: 12px 14px;
+      background: #10141c;
+    }
+
+    .center-block {
+      text-align: center;
+    }
+
     .thumb {
       width: 90px;
       height: 56px;
@@ -212,14 +238,69 @@
     </div>
   </div>
 
-  <div class="host-index">
-    <div class="host-index-title">Hosts</div>
-    <div class="host-index-list">
-      {% for h in hosts %}
-      {% set ip = h.ip %}
-      {% set name = h.names[0] %}
-      <a class="host-index-item" href="#host-{{ ip }}">{{ name or ip }}</a>
-      {% endfor %}
+  <div class="summary">
+    <div class="host-index-title center-block">Summary</div>
+    <div class="meta center-block">
+      {% if meta.cidrs %}CIDR: {{ meta.cidrs|join(', ') }}{% endif %}
+      {% if meta.domains %}{% if meta.cidrs %} · {% endif %}Domains: {{ meta.domains|join(', ') }}{% endif %}
+      {% if meta.asns %}{% if meta.cidrs or meta.domains %} · {% endif %}ASNs: {{ meta.asns|join(', ') }}{% endif %}
+    </div>
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div><strong>Top OS</strong></div>
+        {% if summary.top_os %}
+        {% for name, count in summary.top_os %}
+        <div>{{ name }} · {{ count }}</div>
+        {% endfor %}
+        {% else %}
+        <div>Unknown</div>
+        {% endif %}
+      </div>
+      <div class="summary-card">
+        <div><strong>Top Domains</strong></div>
+        {% if summary.top_domains %}
+        {% for name, count in summary.top_domains %}
+        <div>{{ name }} · {{ count }}</div>
+        {% endfor %}
+        {% else %}
+        <div>None</div>
+        {% endif %}
+      </div>
+      <div class="summary-card">
+        <div><strong>Ports</strong></div>
+        <div>Max open: {{ summary.max_open }}</div>
+        <div>Avg open: {{ summary.avg_open }}</div>
+        {% if summary.top_services %}
+        <div style="margin-top:6px;"><strong>Top services</strong></div>
+        {% for name, count in summary.top_services %}
+        <div>{{ name }} · {{ count }}</div>
+        {% endfor %}
+        {% endif %}
+      </div>
+      <div class="summary-card">
+        <div><strong>Hosts</strong></div>
+        {% for os_name, os_count in summary.top_os %}
+        <div style="margin-top:8px;"><strong>{{ os_name }}</strong> · {{ os_count }}</div>
+        <div class="host-index-list" style="margin-top:6px;">
+          {% for h in hosts %}
+          {% if h.os_display == os_name %}
+          {% set ip = h.ip %}
+          {% set name = h.names[0] %}
+          <a class="host-index-item" href="#host-{{ ip }}">{{ name or ip }}</a>
+          {% endif %}
+          {% endfor %}
+        </div>
+        {% endfor %}
+        {% if not summary.top_os %}
+        <div class="host-index-list" style="margin-top:6px;">
+          {% for h in hosts %}
+          {% set ip = h.ip %}
+          {% set name = h.names[0] %}
+          <a class="host-index-item" href="#host-{{ ip }}">{{ name or ip }}</a>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
     </div>
   </div>
 
@@ -300,7 +381,7 @@
   {% endif %}
 
   <div id="host-{{ ip }}" class="host" data-hay="{{ ' '.join(hay)|lower }}">
-    <h2>
+    <h2 class="center-block">
       <span class="tag">
         {% if h.names %}
         {{ name }} ({{ ip }})
@@ -311,7 +392,7 @@
 
     </h2>
 
-    <div>
+    <div class="center-block">
       <strong>OS:</strong>
       {% if h.os_display %}
       {{ h.os_display }}
@@ -323,7 +404,7 @@
       {% endif %}
     </div>
 
-    <div>
+    <div class="center-block">
       <strong>DNS:</strong>
       {% if h.dns_display %}
       {{ h.dns_display }}

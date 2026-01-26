@@ -91,7 +91,35 @@ def main():
     httpx_by_ip = enrichment.get("httpx", {})
     ferox_by_ip = enrichment.get("ferox", {})
 
-    # Build screenshot list: discovered paths only
+    def _norm_url(url: str) -> str:
+        try:
+            p = urlparse(url)
+        except Exception:
+            return url
+        scheme = (p.scheme or "http").lower()
+        host = (p.hostname or "").lower()
+        port = p.port
+        if (scheme == "http" and port == 80) or (scheme == "https" and port == 443):
+            netloc = host
+        elif port:
+            netloc = f"{host}:{port}"
+        else:
+            netloc = host
+        path = p.path or "/"
+        if path != "/" and path.endswith("/"):
+            path = path[:-1]
+        return f"{scheme}://{netloc}{path}"
+
+    def _alt_urls(url: str) -> list[str]:
+        n = _norm_url(url)
+        alts = {url, n}
+        if n.endswith("/") and n != "http://" and n != "https://":
+            alts.add(n.rstrip("/"))
+        else:
+            alts.add(n + "/" if n != "http://" and n != "https://" else n)
+        return list(alts)
+
+    # Build screenshot list: discovered paths only (plus root)
     all_urls: set[str] = set()
     host_discovered: dict[str, list[str]] = {}
     for host in nmap_result:
@@ -99,6 +127,13 @@ def main():
         if not ip:
             continue
         httpx_items = httpx_by_ip.get(ip, [])
+        # Ensure root is always included when we have a base URL
+        for r in httpx_items:
+            if r.get("from_katana"):
+                continue
+            if r.get("url"):
+                all_urls.add(r.get("url"))
+                break
         discovered_urls = []
         for r in httpx_items:
             if r.get("from_katana") and r.get("url"):
@@ -114,12 +149,23 @@ def main():
     screen_dir = Path("output/screens")
     screen_map_abs = capture_screenshots(all_urls, screen_dir)
     screen_map = {u: str(Path(p).relative_to(Path("output"))) for u, p in screen_map_abs.items()}
+    # Add normalized/alternate keys for robust lookup
+    expanded_map: dict[str, str] = {}
+    for u, path in screen_map.items():
+        for alt in _alt_urls(u):
+            expanded_map[alt] = path
+    screen_map = expanded_map
 
     results = []
     for host in nmap_result:
         host_ip = host.get("ip")
         screen_urls = host_discovered.get(host_ip, [])
-        screens = {u: screen_map[u] for u in screen_urls if u in screen_map}
+        screens = {}
+        for u in screen_urls:
+            for alt in _alt_urls(u):
+                if alt in screen_map:
+                    screens[u] = screen_map[alt]
+                    break
         results.append({
             **host,
             "httpx": httpx_by_ip.get(host_ip, []),
@@ -127,7 +173,7 @@ def main():
             "screens": screens,
         })
 
-    render_report(results, "output/report.html")
+    render_report(results, "output/report.html", meta={"cidrs": cidrs, "domains": domains, "asns": asns})
 
 
 

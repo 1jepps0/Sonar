@@ -24,7 +24,7 @@ def port_counts(ports: list[dict[str, Any]] | None) -> dict[str, int]:
         counts[state] = counts.get(state, 0) + 1
     return counts
 
-def render_report(results: list[dict[str, Any]], out_html: str | Path) -> Path:
+def render_report(results: list[dict[str, Any]], out_html: str | Path, meta: dict[str, Any] | None = None) -> Path:
     out_html = Path(out_html)
     out_html.parent.mkdir(parents=True, exist_ok=True)
 
@@ -243,6 +243,30 @@ def render_report(results: list[dict[str, Any]], out_html: str | Path) -> Path:
     def merge_discovered(katana_httpx: list[dict[str, Any]], ferox: list[dict[str, Any]]) -> list[dict[str, Any]]:
         merged: dict[str, dict[str, Any]] = {}
 
+        def norm_url(url: str | None) -> str | None:
+            if not url:
+                return None
+            try:
+                from urllib.parse import urlparse, urlunparse
+                p = urlparse(url)
+                scheme = (p.scheme or "http").lower()
+                host = (p.hostname or "").lower()
+                port = p.port
+                # drop default ports
+                if (scheme == "http" and port == 80) or (scheme == "https" and port == 443):
+                    netloc = host
+                elif port:
+                    netloc = f"{host}:{port}"
+                else:
+                    netloc = host
+                path = p.path or "/"
+                # drop trailing slash except root
+                if path != "/" and path.endswith("/"):
+                    path = path[:-1]
+                return urlunparse((scheme, netloc, path, "", p.query, ""))
+            except Exception:
+                return url
+
         def score(item: dict[str, Any]) -> int:
             s = 0
             if item.get("status") or item.get("status_code"):
@@ -257,12 +281,22 @@ def render_report(results: list[dict[str, Any]], out_html: str | Path) -> Path:
             url = item.get("url")
             if not url:
                 return
-            existing = merged.get(url)
-            if not existing:
-                merged[url] = item
+            key = norm_url(url)
+            if not key:
                 return
+            existing = merged.get(key)
+            if not existing:
+                merged[key] = item
+                return
+            # Prefer ferox over katana/httpx when both exist for same URL
+            if existing.get("source") != item.get("source"):
+                if item.get("source") == "ferox":
+                    merged[key] = item
+                    return
+                if existing.get("source") == "ferox":
+                    return
             if score(item) > score(existing):
-                merged[url] = item
+                merged[key] = item
 
         for r in katana_httpx:
             add_item({
@@ -270,6 +304,7 @@ def render_report(results: list[dict[str, Any]], out_html: str | Path) -> Path:
                 "status": r.get("status_code"),
                 "content_type": r.get("content_type"),
                 "content_length": r.get("content_length"),
+                "source": "katana",
             })
         for f in ferox:
             add_item({
@@ -277,6 +312,7 @@ def render_report(results: list[dict[str, Any]], out_html: str | Path) -> Path:
                 "status": f.get("status"),
                 "content_type": f.get("content_type"),
                 "content_length": f.get("content_length"),
+                "source": "ferox",
             })
 
         def sort_key(item: dict[str, Any]):
@@ -496,10 +532,56 @@ def render_report(results: list[dict[str, Any]], out_html: str | Path) -> Path:
             "rdp_encryption": rdp_encryption,
         })
 
+    # Sort hosts by open ports (desc), then IP
+    def _host_sort_key(h: dict[str, Any]):
+        return (
+            -int(h.get("port_counts", {}).get("open", 0)),
+            h.get("ip") or "",
+        )
+    enriched = sorted(enriched, key=_host_sort_key)
+
+    # Summary stats
+    os_counts: dict[str, int] = {}
+    domain_counts: dict[str, int] = {}
+    open_ports: list[int] = []
+    service_counts: dict[str, int] = {}
+    for h in enriched:
+        if h.get("os_display"):
+            os_counts[h["os_display"]] = os_counts.get(h["os_display"], 0) + 1
+        dns = h.get("dns_display")
+        if dns and "." in dns:
+            parts = dns.split(".")
+            if len(parts) >= 2:
+                domain = ".".join(parts[-2:])
+                domain_counts[domain] = domain_counts.get(domain, 0) + 1
+        open_ports.append(int(h.get("port_counts", {}).get("open", 0)))
+        for p in h.get("ports_sorted", []) or []:
+            if p.get("state") != "open":
+                continue
+            svc = p.get("service")
+            if svc:
+                service_counts[svc] = service_counts.get(svc, 0) + 1
+
+    top_os = sorted(os_counts.items(), key=lambda x: (-x[1], x[0]))[:3]
+    top_domains = sorted(domain_counts.items(), key=lambda x: (-x[1], x[0]))[:5]
+    top_services = sorted(service_counts.items(), key=lambda x: (-x[1], x[0]))[:5]
+    max_open = max(open_ports) if open_ports else 0
+    avg_open = round(sum(open_ports) / len(open_ports), 2) if open_ports else 0
+
+    summary = {
+        "top_os": top_os,
+        "top_domains": top_domains,
+        "top_services": top_services,
+        "max_open": max_open,
+        "avg_open": avg_open,
+    }
+
     html_text = template.render(
         generated_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         host_count=len(enriched),
         hosts=enriched,
+        summary=summary,
+        meta=meta or {},
     )
 
     out_html.write_text(html_text, encoding="utf-8")
