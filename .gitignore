@@ -1,0 +1,98 @@
+# ======================
+# Python
+# ======================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+.env
+.venv/
+venv/
+ENV/
+
+# ======================
+# OS / Editor junk
+# ======================
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*.tmp
+
+# ======================
+# Logs
+# ======================
+*.log
+logs/
+*.out
+
+# ======================
+# Recon Outputs
+# ======================
+output/
+reports/
+screenshots/
+scans/
+results/
+
+# Raw tool output
+*.xml
+*.nmap
+*.gnmap
+*.json
+*.csv
+*.html
+
+# ======================
+# Nmap
+# ======================
+nmap-results/
+.nmap/
+*.pcap
+
+# ======================
+# Temporary / Cache
+# ======================
+.cache/
+.cache-*
+tmp/
+temp/
+
+# ======================
+# Credentials / Secrets
+# ======================
+*.key
+*.pem
+*.crt
+*.pfx
+*.p12
+*.der
+secrets.*
+config.local.*
+credentials.*
+
+# ======================
+# Build / Packaging
+# ======================
+build/
+output/
+dist/
+pip-wheel-metadata/
+
+# ======================
+# Testing / Coverage
+# ======================
+.coverage
+htmlcov/
+.pytest_cache/
+
+# ======================
+# Misc
+# ======================
+*.bak
+*.old
+*.orig

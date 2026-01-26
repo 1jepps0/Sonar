@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Recon Report</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      margin: 24px;
+      background-color: #0f1115;
+      color: #e6e6ea;
+    }
+
+    .meta {
+      color: #a8a8b3;
+      margin-bottom: 18px;
+    }
+
+    .host {
+      border: 1px solid #242833;
+      border-radius: 12px;
+      padding: 16px;
+      margin: 18px 0;
+      background: #141821;
+    }
+
+    .tag {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      margin-bottom: 14px;
+    }
+
+    table.aligned {
+      table-layout: fixed;
+    }
+
+
+    th,
+    td {
+      border-bottom: 1px solid #202532;
+      text-align: left;
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+
+    th:not(:first-child),
+    td:not(:first-child) {
+      font-size: 12px;
+      padding: 6px 8px;
+    }
+
+    th {
+      background-color: #1a1f2b;
+      position: sticky;
+      top: 0;
+    }
+
+    table.aligned th,
+    table.aligned td,
+    table.ports th,
+    table.ports td {
+      border: 1px solid #202532;
+    }
+
+    .table-title {
+      background-color: #1a1f2b;
+      font-weight: 600;
+      text-align: left;
+    }
+
+    th.empty {
+      color: transparent;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 999px;
+      border: 1px solid #2a3140;
+      margin-left: 8px;
+      font-size: 12px;
+      color: #c9c9d6;
+    }
+
+    .dot {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #3a4254;
+      margin-left: 8px;
+      margin-right: 6px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      font-size: 12px;
+      color: #c9c9d6;
+      border: 1px solid #2a3140;
+      border-radius: 999px;
+      padding: 2px 8px;
+      margin-left: 8px;
+    }
+
+    input[type="search"] {
+      padding: 8px 10px;
+      min-width: 280px;
+      background: #0f1115;
+      border: 1px solid #2a3140;
+      color: #e6e6ea;
+    }
+
+    .page-header {
+      text-align: center;
+      margin-bottom: 16px;
+    }
+
+    .search-wrap {
+      margin-top: 12px;
+    }
+
+    .host-index {
+      border: 1px solid #242833;
+      border-radius: 12px;
+      padding: 12px 14px;
+      background: #141821;
+      margin-bottom: 18px;
+    }
+
+    .host-index-title {
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .host-index-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .host-index-item {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid #2a3140;
+      color: #c9c9d6;
+      text-decoration: none;
+      font-size: 12px;
+    }
+
+    .host-index-item:hover {
+      color: #e6e6ea;
+      border-color: #3a4254;
+    }
+
+    .thumb {
+      width: 90px;
+      height: 56px;
+      object-fit: cover;
+      border-radius: 6px;
+      border: 1px solid #2a3140;
+      background: #0f1115;
+      display: block;
+    }
+
+    details {
+      margin-top: 14px;
+    }
+
+    details {
+      margin-top: 10px;
+      padding-left: 0;
+    }
+
+    details > summary {
+      cursor: pointer;
+      list-style: none;
+      margin-bottom: 6px;
+    }
+
+    details > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    details > summary::before {
+      content: "▸ ";
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    details[open] > summary::before {
+      content: "▾ ";
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page-header">
+    <h1>Recon Report</h1>
+    <div class="meta">Generated: {{ generated_at }} · Hosts: {{ host_count }}</div>
+    <div class="search-wrap">
+      <input id="q" type="search" placeholder="Filter by IP, OS, port, service…" oninput="filterHosts()" />
+    </div>
+  </div>
+
+  <div class="host-index">
+    <div class="host-index-title">Hosts</div>
+    <div class="host-index-list">
+      {% for h in hosts %}
+      {% set ip = h.ip %}
+      {% set name = h.names[0] %}
+      <a class="host-index-item" href="#host-{{ ip }}">{{ name or ip }}</a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <script>
+    function filterHosts() {
+      const q = document.getElementById('q').value.toLowerCase();
+      document.querySelectorAll('.host').forEach(el => {
+        el.style.display = (el.dataset.hay || '').includes(q) ? '' : 'none';
+      });
+    }
+  </script>
+
+  {% for h in hosts %}
+  {% set ip = h.ip %}
+  {% set name = h.names[0] %}
+  {% set hay = [ip] %}
+  {% if h.os_deduped %}
+  {% for m in h.os_deduped[:5] %}{% set _ = hay.append(m.name) %}{% endfor %}
+  {% endif %}
+  {% if name %}
+  {% set _ = hay.append(name) %}
+  {% endif %}
+  {% for p in h.ports_sorted %}
+  {% set _ = hay.append(p.port|string) %}
+  {% set _ = hay.append(p.service or '') %}
+  {% set _ = hay.append(p.state or '') %}
+  {% endfor %}
+  {% if h.smb_summary %}
+  {% for k, v in h.smb_summary.items() %}
+  {% set _ = hay.append(k ~ ': ' ~ v) %}
+  {% endfor %}
+  {% endif %}
+  {% if h.smb_shares %}
+  {% for s in h.smb_shares %}
+  {% set _ = hay.append(s.share or '') %}
+  {% set _ = hay.append(s.access or '') %}
+  {% set _ = hay.append(s.note or '') %}
+  {% endfor %}
+  {% endif %}
+  {% if h.smb_account_used %}
+  {% set _ = hay.append(h.smb_account_used) %}
+  {% endif %}
+  {% if h.ldap_rootdse %}
+  {% for s in h.ldap_rootdse %}
+  {% set _ = hay.append(s.key ~ ': ' ~ s.value) %}
+  {% endfor %}
+  {% endif %}
+  {% if h.rdp_info %}
+  {% for k, v in h.rdp_info.items() %}
+  {% set _ = hay.append(k ~ ': ' ~ v) %}
+  {% endfor %}
+  {% endif %}
+  {% if h.rdp_cert %}
+  {% for k, v in h.rdp_cert.items() %}
+  {% set _ = hay.append(k ~ ': ' ~ v) %}
+  {% endfor %}
+  {% endif %}
+  {% if h.rdp_encryption %}
+  {% for k, v in h.rdp_encryption.items() %}
+  {% set _ = hay.append(k ~ ': ' ~ v) %}
+  {% endfor %}
+  {% endif %}
+  {% if h.discovered_sorted %}
+  {% for f in h.discovered_sorted %}
+  {% set _ = hay.append(f.url or '') %}
+  {% endfor %}
+  {% endif %}
+  {% if h.httpx_sorted %}
+  {% for r in h.httpx_sorted %}
+  {% set _ = hay.append(r.url or '') %}
+  {% set _ = hay.append(r.title or '') %}
+  {% set _ = hay.append(r.webserver or '') %}
+  {% set _ = hay.append(r.content_type or '') %}
+  {% if r.tech %}
+  {% for t in r.tech %}{% set _ = hay.append(t) %}{% endfor %}
+  {% endif %}
+  {% endfor %}
+  {% endif %}
+
+  <div id="host-{{ ip }}" class="host" data-hay="{{ ' '.join(hay)|lower }}">
+    <h2>
+      <span class="tag">
+        {% if h.names %}
+        {{ name }} ({{ ip }})
+        {% else %}
+        {{ ip }}
+        {% endif %}
+      </span>
+
+    </h2>
+
+    <div>
+      <strong>OS:</strong>
+      {% if h.os_display %}
+      {{ h.os_display }}
+      {% if h.os_source %}
+      <span class="pill">{{ h.os_source }}</span>
+      {% endif %}
+      {% else %}
+      Unknown
+      {% endif %}
+    </div>
+
+    <div>
+      <strong>DNS:</strong>
+      {% if h.dns_display %}
+      {{ h.dns_display }}
+      {% if h.dns_source %}
+      <span class="pill">{{ h.dns_source }}</span>
+      {% endif %}
+      {% else %}
+      Unknown
+      {% endif %}
+    </div>
+
+    {% if h.port_counts.get('open', 0) or h.port_counts.get('filtered', 0) %}
+    <table class="aligned">
+      <colgroup>
+        <col style="width: 10%">
+        <col style="width: 10%">
+        <col style="width: 15%">
+        <col style="width: 20%">
+        <col style="width: 45%">
+      </colgroup>
+      <thead>
+        <tr>
+          <th colspan="5" class="table-title">Ports</th>
+        </tr>
+        <tr>
+          <th>Port</th>
+          <th>Proto</th>
+          <th>State</th>
+          <th>Service</th>
+          <th>Version</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in h.ports_sorted %}
+        <tr>
+          <td class="tag">{{ p.port }}</td>
+          <td>{{ p.protocol }}</td>
+          <td>{{ p.state }}</td>
+          <td>{{ p.service }}</td>
+          <td>{{ (p.product or '') ~ (' ' if p.product and p.version else '') ~ (p.version or '') ~ (' ' if (p.product or p.version) and p.extrainfo else '') ~ (p.extrainfo or '') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    {% if h.httpx_sorted %}
+    <table class="aligned">
+      <colgroup>
+        <col style="width: 10%">
+        <col style="width: 10%">
+        <col style="width: 12%">
+        <col style="width: 18%">
+        <col style="width: 18%">
+        <col style="width: 18%">
+        <col style="width: 7%">
+        <col style="width: 7%">
+      </colgroup>
+      <thead>
+        <tr>
+          <th colspan="8" class="table-title">Web Services</th>
+        </tr>
+        <tr>
+          <th colspan="2">URL</th>
+          <th>Status</th>
+          <th>Title</th>
+          <th>Webserver</th>
+          <th>Content-Type</th>
+          <th>Length</th>
+          <th>Tech</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in h.httpx_sorted if not r.from_katana %}
+        <tr>
+          <td class="tag" colspan="2">
+            {% if r.url %}
+            <a href="{{ r.url }}" target="_blank" rel="noopener noreferrer">{{ r.url }}</a>
+            {% else %}
+            {{ r.host or '' }}
+            {% endif %}
+          </td>
+          <td>{{ r.status_code or '' }}</td>
+          <td>{{ r.title or '' }}</td>
+          <td>{{ r.webserver or '' }}</td>
+          <td>{{ r.content_type or '' }}</td>
+          <td>{{ r.content_length or '' }}</td>
+          <td>
+            {% if r.tech %}
+            {{ r.tech|join(', ') }}
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    {% if h.discovered_sorted %}
+    <details style="margin-top: 10px;">
+      <summary>Discovered Paths ({{ h.discovered_sorted|length }})</summary>
+      <table class="aligned">
+        <colgroup>
+          <col style="width: 10%">
+          <col style="width: 10%">
+          <col style="width: 12%">
+          <col style="width: 18%">
+          <col style="width: 18%">
+          <col style="width: 18%">
+          <col style="width: 7%">
+          <col style="width: 7%">
+        </colgroup>
+        <thead>
+          <tr>
+            <th colspan="8" class="table-title">Discovered Paths</th>
+          </tr>
+          <tr>
+            <th colspan="2">URL</th>
+            <th>Shot</th>
+            <th>Status</th>
+            <th>Content-Type</th>
+            <th>Length</th>
+            <th class="empty">Content-Type</th>
+            <th class="empty">Length</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in h.discovered_sorted %}
+          <tr>
+            <td class="tag" colspan="2">
+              {% if f.url %}
+              <a href="{{ f.url }}" target="_blank" rel="noopener noreferrer">{{ f.url }}</a>
+              {% endif %}
+            </td>
+            <td>
+              {% if f.url and h.screens.get(f.url) %}
+              <a href="{{ h.screens.get(f.url) }}" target="_blank" rel="noopener noreferrer">
+                <img class="thumb" src="{{ h.screens.get(f.url) }}" alt="Screenshot for {{ f.url }}">
+              </a>
+              {% endif %}
+            </td>
+            <td>{{ f.status or '' }}</td>
+            <td>{{ f.content_type or '' }}</td>
+            <td>{{ f.content_length or '' }}</td>
+            <td></td>
+            <td></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </details>
+    {% endif %}
+
+    {% if h.smb_summary %}
+    <table class="aligned">
+      <colgroup>
+        <col style="width: 25%">
+        <col style="width: 75%">
+      </colgroup>
+      <thead>
+        <tr>
+          <th colspan="2" class="table-title">SMB / AD Summary</th>
+        </tr>
+        <tr>
+          <th>Field</th>
+          <th>Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for k, v in h.smb_summary.items() %}
+        <tr>
+          <td class="tag">{{ k }}</td>
+          <td>{{ v }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    {% if h.smb_shares %}
+    <table class="aligned">
+      <colgroup>
+        <col style="width: 35%">
+        <col style="width: 15%">
+        <col style="width: 20%">
+        <col style="width: 30%">
+      </colgroup>
+      <thead>
+        <tr>
+          <th colspan="4" class="table-title">SMB Shares</th>
+        </tr>
+        <tr>
+          <th>Share</th>
+          <th>Access</th>
+          <th>Account Used</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in h.smb_shares %}
+        <tr>
+          <td class="tag">{{ s.share }}</td>
+          <td>{{ s.access }}</td>
+          <td>{{ h.smb_account_used or '' }}</td>
+          <td>{{ s.note }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    {% if h.ldap_rootdse %}
+    <table class="aligned">
+      <colgroup>
+        <col style="width: 30%">
+        <col style="width: 70%">
+      </colgroup>
+      <thead>
+        <tr>
+          <th colspan="2" class="table-title">LDAP RootDSE</th>
+        </tr>
+        <tr>
+          <th>Field</th>
+          <th>Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in h.ldap_rootdse %}
+        <tr>
+          <td class="tag">{{ s.key }}</td>
+          <td>{{ s.value }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    {% if h.rdp_info or h.rdp_cert or h.rdp_encryption %}
+    <table class="aligned">
+      <colgroup>
+        <col style="width: 30%">
+        <col style="width: 70%">
+      </colgroup>
+      <thead>
+        <tr>
+          <th colspan="2" class="table-title">RDP Info</th>
+        </tr>
+        <tr>
+          <th>Field</th>
+          <th>Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if h.rdp_port %}
+        <tr>
+          <td class="tag">Port</td>
+          <td>{{ h.rdp_port }}</td>
+        </tr>
+        {% endif %}
+        {% for k, v in h.rdp_info.items() %}
+        <tr>
+          <td class="tag">{{ k }}</td>
+          <td>{{ v }}</td>
+        </tr>
+        {% endfor %}
+        {% if h.rdp_encryption %}
+        <tr>
+          <td class="tag">Encryption</td>
+          <td></td>
+        </tr>
+        {% for k, v in h.rdp_encryption.items() %}
+        <tr>
+          <td class="tag">{{ k }}</td>
+          <td>{{ v }}</td>
+        </tr>
+        {% endfor %}
+        {% endif %}
+        {% if h.rdp_cert %}
+        <tr>
+          <td class="tag">TLS Cert</td>
+          <td></td>
+        </tr>
+        {% for k, v in h.rdp_cert.items() %}
+        <tr>
+          <td class="tag">{{ k }}</td>
+          <td>{{ v }}</td>
+        </tr>
+        {% endfor %}
+        {% endif %}
+      </tbody>
+    </table>
+    {% endif %}
+
+
+
+  </div>
+  {% endfor %}
+</body>
+
+</html>
