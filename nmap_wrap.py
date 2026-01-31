@@ -1,4 +1,7 @@
+import json
 import subprocess
+from pathlib import Path
+from datetime import datetime
 import xml.etree.ElementTree as ET
 
 def dedupe_os_matches(os_matches):
@@ -98,7 +101,14 @@ def parse_nmap_xml(xml_data):
     return hosts
 
 
-def nmap_scan(target):
+def nmap_scan(targets, extra_args=None, raw_dir: str | None = None):
+    if isinstance(targets, str):
+        target_list = [targets]
+    else:
+        target_list = [t for t in targets if t]
+    if not target_list:
+        raise ValueError("No nmap targets provided")
+
     cmd = [
         "nmap",
         "-Pn",
@@ -113,8 +123,10 @@ def nmap_scan(target):
         "--host-timeout", "5m",
         # "-T4" breaks parser for some reason
         "-oX", "-",      # XML output to stdout
-        target
     ]
+    if extra_args:
+        cmd.extend(extra_args)
+    cmd.extend(target_list)
 
     result = subprocess.run(
         cmd,
@@ -125,5 +137,21 @@ def nmap_scan(target):
 
     if result.returncode != 0:
         raise RuntimeError(result.stderr)
+
+    if raw_dir:
+        Path(raw_dir).mkdir(parents=True, exist_ok=True)
+        ts = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+        meta = {
+            "timestamp_utc": ts,
+            "tool": "nmap",
+            "cmd": cmd,
+            "targets": target_list,
+            "returncode": result.returncode,
+        }
+        prefix = Path(raw_dir) / f"nmap_{ts.replace(':', '').replace('-', '')}"
+        (prefix.with_suffix(".meta.json")).write_text(json.dumps(meta, indent=2), encoding="utf-8")
+        (prefix.with_suffix(".xml")).write_text(result.stdout, encoding="utf-8")
+        if result.stderr:
+            (prefix.with_suffix(".stderr")).write_text(result.stderr, encoding="utf-8")
 
     return result.stdout

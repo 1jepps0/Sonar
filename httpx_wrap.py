@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+from datetime import datetime
+from pathlib import Path
 from typing import Any, Iterable
 
 def find_httpx_binary() -> str:
@@ -19,6 +21,8 @@ def run_httpx(
     timeout: int = 5,
     ports: str | None = None,
     no_verify: bool = True,
+    extra_args: list[str] | None = None,
+    raw_dir: str | None = None,
 ) -> list[dict[str, Any]]:
     """
     Runs Kali's httpx-toolkit and returns parsed JSONL records.
@@ -37,6 +41,8 @@ def run_httpx(
         "-cl",
         "-ct",
         "-location",
+        "-fr",
+        "-include-chain",
         "-ip",
         "-t", str(threads),          # this version supports -t
         "-timeout", str(timeout),    # this version supports -timeout (int seconds)
@@ -50,9 +56,12 @@ def run_httpx(
 
     if ports:
         cmd.extend(["-p", ports])
+    if extra_args:
+        cmd.extend(extra_args)
 
     # Feed targets on stdin
-    stdin_data = "\n".join(t.strip() for t in targets if t and t.strip()) + "\n"
+    targets_list = [t.strip() for t in targets if t and t.strip()]
+    stdin_data = "\n".join(targets_list) + "\n"
 
     proc = subprocess.run(cmd, input=stdin_data, capture_output=True, text=True)
 
@@ -68,5 +77,21 @@ def run_httpx(
             records.append(json.loads(line))
         except json.JSONDecodeError:
             continue
+
+    if raw_dir:
+        Path(raw_dir).mkdir(parents=True, exist_ok=True)
+        ts = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+        meta = {
+            "timestamp_utc": ts,
+            "tool": "httpx-toolkit",
+            "cmd": cmd,
+            "targets_count": len(targets_list),
+            "returncode": proc.returncode,
+        }
+        prefix = Path(raw_dir) / f"httpx_{ts.replace(':', '').replace('-', '')}"
+        (prefix.with_suffix(".meta.json")).write_text(json.dumps(meta, indent=2), encoding="utf-8")
+        (prefix.with_suffix(".jsonl")).write_text(proc.stdout, encoding="utf-8")
+        if proc.stderr:
+            (prefix.with_suffix(".stderr")).write_text(proc.stderr, encoding="utf-8")
 
     return records

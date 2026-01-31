@@ -501,6 +501,12 @@ def render_report(results: list[dict[str, Any]], out_html: str | Path, meta: dic
         elif rdp_dns_computer:
             dns_display = rdp_dns_computer
             dns_source = "RDP"
+        elif h.get("rdns"):
+            dns_display = h.get("rdns")
+            dns_source = "RDNS"
+        elif names:
+            dns_display = names[0]
+            dns_source = "Nmap"
 
         enriched.append({
             **h,
@@ -514,7 +520,7 @@ def render_report(results: list[dict[str, Any]], out_html: str | Path, meta: dic
             "dns_source": dns_source,
             "port_counts": port_counts(ports),
             "ports_sorted": sorted(ports, key=lambda x: (x.get("protocol",""), int(x.get("port", 0)))),
-            "httpx_sorted": sorted(httpx, key=lambda x: (x.get("url") or x.get("host") or "")),
+            "httpx_sorted": sorted(httpx, key=lambda x: (x.get("display_url") or x.get("final_url") or x.get("url") or x.get("host") or "")),
             "discovered_sorted": merge_discovered(katana_httpx, ferox),
             "screens": screens,
             "smb_ad_scripts": smb_ad_scripts,

@@ -53,4 +53,17 @@ python3 main.py --cidr 192.168.56.0/24
 ```
 
 Output report:
-- `output/report.html`
+- `output/<run_timestamp>/report.html`
+
+## Config
+
+Edit `config.json` to:
+- Add extra flags for tool commands (nmap/httpx/katana/ferox/theHarvester)
+- Define a scope blacklist for domains/IPs/CIDRs/regex
+- Per-run output is stored under `output/<run_timestamp>/` (raw, screens, report)
+
+Use a custom config path:
+
+```bash
+python3 main.py --config myconfig.json --domain example.com
+```

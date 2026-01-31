@@ -243,7 +243,8 @@
     <div class="meta center-block">
       {% if meta.cidrs %}CIDR: {{ meta.cidrs|join(', ') }}{% endif %}
       {% if meta.domains %}{% if meta.cidrs %} · {% endif %}Domains: {{ meta.domains|join(', ') }}{% endif %}
-      {% if meta.asns %}{% if meta.cidrs or meta.domains %} · {% endif %}ASNs: {{ meta.asns|join(', ') }}{% endif %}
+      {% if meta.companies %}{% if meta.cidrs or meta.domains %} · {% endif %}Companies: {{ meta.companies|join(', ') }}{% endif %}
+      {% if meta.asns %}{% if meta.cidrs or meta.domains or meta.companies %} · {% endif %}ASNs: {{ meta.asns|join(', ') }}{% endif %}
     </div>
     <div class="summary-grid">
       <div class="summary-card">
@@ -370,7 +371,7 @@
   {% endif %}
   {% if h.httpx_sorted %}
   {% for r in h.httpx_sorted %}
-  {% set _ = hay.append(r.url or '') %}
+  {% set _ = hay.append(r.display_url or r.final_url or r.url or '') %}
   {% set _ = hay.append(r.title or '') %}
   {% set _ = hay.append(r.webserver or '') %}
   {% set _ = hay.append(r.content_type or '') %}
@@ -456,7 +457,8 @@
       <colgroup>
         <col style="width: 10%">
         <col style="width: 10%">
-        <col style="width: 12%">
+        <col style="width: 8%">
+        <col style="width: 10%">
         <col style="width: 18%">
         <col style="width: 18%">
         <col style="width: 18%">
@@ -465,10 +467,11 @@
       </colgroup>
       <thead>
         <tr>
-          <th colspan="8" class="table-title">Web Services</th>
+          <th colspan="9" class="table-title">Web Services</th>
         </tr>
         <tr>
           <th colspan="2">URL</th>
+          <th>Shot</th>
           <th>Status</th>
           <th>Title</th>
           <th>Webserver</th>
@@ -481,10 +484,19 @@
         {% for r in h.httpx_sorted if not r.from_katana %}
         <tr>
           <td class="tag" colspan="2">
-            {% if r.url %}
-            <a href="{{ r.url }}" target="_blank" rel="noopener noreferrer">{{ r.url }}</a>
+            {% set url_display = r.display_url or r.final_url or r.url %}
+            {% if url_display %}
+            <a href="{{ url_display }}" target="_blank" rel="noopener noreferrer">{{ url_display }}</a>
             {% else %}
             {{ r.host or '' }}
+            {% endif %}
+          </td>
+          <td>
+            {% set url_display = r.display_url or r.final_url or r.url %}
+            {% if url_display and h.screens.get(url_display) %}
+            <a href="{{ h.screens.get(url_display) }}" target="_blank" rel="noopener noreferrer">
+              <img class="thumb" src="{{ h.screens.get(url_display) }}" alt="Screenshot for {{ url_display }}">
+            </a>
             {% endif %}
           </td>
           <td>{{ r.status_code or '' }}</td>
